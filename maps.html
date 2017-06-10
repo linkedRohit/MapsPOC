@@ -1,0 +1,196 @@
+<html>
+<head>
+  <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false&libraries=places"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <style>
+  body {margin: 0.3em;}
+
+  .mine {width: 100%; margin: 0.1em;}
+
+  #buttonbar {background-color: whitesmoke;}
+
+  #map_go {
+    border: 1px solid red;
+    height: 100%;
+    position:absolute;
+  }
+
+  </style>
+</head>
+<body>
+ <iframe id="embeddedMap" src="" height=250 width=400>
+  </iframe>
+<div id="buttonbar" class="mine">
+  <a href="#" id="mapUrl">Google Map Url</a>
+  <input id="nptsearch" type="text" placeholder="Put your venue here" />
+</div>
+
+<div id="map_go" class="mine"></div>
+
+<script>
+//directionsService = new google.maps.DirectionsService();
+//directionsDisplay = new google.maps.DirectionsRenderer();
+var API_KEY = 'AIzaSyAHmX0dgHLdpHq8uNAuecTgKr2rPXEDRC8';
+var geocoder;
+var mapUrl = $('#mapUrl');
+var IN = new google.maps.LatLng(20.5937, 78.9629);
+var mapLocQueryUrl = 'https://www.google.com/maps?q=';
+var mapEmbedUrl = 'https://www.google.com/maps/embed/v1/place?key=' + API_KEY + '&q=';
+geocoder = new google.maps.Geocoder();
+
+var noStreetNames = [{
+  featureType: "road",
+  elementType: "labels",
+  stylers: [{
+      visibility: "off"}]}];
+
+hideLabels = new google.maps.StyledMapType(noStreetNames, {
+  name: "hideLabels"
+});
+
+var myOptions = {
+  zoom: 1,
+  mapTypeId: google.maps.MapTypeId.ROADMAP,
+  center: IN
+}
+
+var showPosition = function(position) {
+  var userLatLng = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+  var mapUrl = mapLocQueryUrl + position.coords.latitude +','+position.coords.longitude;
+  marker = new google.maps.Marker({
+      position: userLatLng,
+      title: 'Selected Walkin venue',
+      draggable: true,
+      map: map,
+      //url: mapUrl,
+      zoom: 10,
+      animation:google.maps.Animation.DROP
+  });
+  setUrl(userLatLng);
+
+  marker.addListener('click', toggleBounce);
+
+  function toggleBounce() {
+    if (marker.getAnimation() !== null) {
+      marker.setAnimation(null);
+    } else {
+      marker.setAnimation(google.maps.Animation.BOUNCE);
+    }
+  }
+
+  var infowindow = new google.maps.InfoWindow({
+      content: '<div id="content">'+
+            '<div id="siteNotice">'+
+            '</div>'+
+            '<h1 id="firstHeading" class="firstHeading">Uluru</h1>'+
+            '<div id="bodyContent">'+
+            '<p><b>Uluru</b>, also referred to as <b>Ayers Rock</b>, is a large ' +
+            'sandstone rock formation in the southern part of the '+
+              'Northern Territory, central Australia. It lies 335&#160;km (208&#160;mi) <a href="https://en.wikipedia.org/w/index.php?title=Uluru&oldid=297882194">'+
+            '</div>'+
+            '</div>'
+
+  });
+
+
+  function setUrl(latLongObject) {
+    geocoder.geocode({
+      'location': latLongObject
+    }, function(results, status) {
+      if (status === google.maps.GeocoderStatus.OK) {
+        console.log(results[0]);
+        if (results[0]) {
+            $('#mapUrl')[0].href = mapLocQueryUrl + results[0].formatted_address;
+            $('#mapUrl')[0].target = '_blank';
+            $('#embeddedMap')[0].src = mapEmbedUrl + results[0].formatted_address;
+        } else {
+          console.log('No results found');
+        }
+      } else {
+        console.log('Geocoder failed due to: ' + status);
+      }
+    });
+  }
+
+  google.maps.event.addListener(marker, 'click', function(e) {
+    setUrl(e.latLng);
+  });
+
+  map.addListener('click', function(e) {
+    setUrl(e.latLng);
+  });
+
+  var input = document.getElementById('nptsearch');
+  var autocomplete = new google.maps.places.Autocomplete(input);
+
+  autocomplete.bindTo('bounds', map);
+
+  google.maps.event.addListener(autocomplete, 'place_changed', function() {
+      infowindow.close();
+      var place = autocomplete.getPlace();
+      console.log(place.geometry.location.lng(), 'place changed');
+      if (place.geometry.viewport) {
+          map.fitBounds(place.geometry.viewport);
+      } else {
+          map.setCenter(place.geometry.location);
+          map.setZoom(7);
+      }
+
+      var image = new google.maps.MarkerImage(
+        place.icon,
+        new google.maps.Size(71, 71), new google.maps.Point(0, 0),
+        new google.maps.Point(17, 34), new google.maps.Size(35, 35)
+      );
+
+      marker.setIcon(image);
+      $('#mapUrl')[0].href = place.url;//mapLocQueryUrl + place.formatted_address;
+      $('#mapUrl')[0].target = '_blank';
+      //marker.setPosition(place.geometry.location);
+      infowindow.setContent('<div><strong>' + place.name + '</strong><br>' + place.formatted_address + '<br/><a href="'+ place.url +'" target="_blank">View On Google Map</a>');
+      $('#embeddedMap')[0].src = mapEmbedUrl + place.formatted_address;
+      marker.setPosition(new google.maps.LatLng(place.geometry.location.lat(), place.geometry.location.lng()));
+      infowindow.open(map, marker);
+  });
+
+  map.setCenter(marker.getPosition());
+
+}
+
+navigator.geolocation.getCurrentPosition(showPosition);
+
+map = new google.maps.Map(document.getElementById("map_go"), myOptions);
+//directionsDisplay.setMap(map);
+
+map.mapTypes.set('hide_street_names', hideLabels);
+
+function offsetCenter(latlng, offsetx, offsety) {
+  var scale = Math.pow(2, map.getZoom());
+  var nw = new google.maps.LatLng(
+  map.getBounds().getNorthEast().lat(), map.getBounds().getSouthWest().lng());
+
+  var worldCoordinateCenter = map.getProjection().fromLatLngToPoint(latlng);
+  var pixelOffset = new google.maps.Point((offsetx / scale) || 0, (offsety / scale) || 0)
+
+  var worldCoordinateNewCenter = new google.maps.Point(
+  worldCoordinateCenter.x - pixelOffset.x, worldCoordinateCenter.y + pixelOffset.y);
+
+  var newCenter = map.getProjection().fromPointToLatLng(worldCoordinateNewCenter);
+
+  map.setCenter(newCenter);
+}
+
+$(window).on('resize', function() {
+  var currCenter = map.getCenter();
+  google.maps.event.trigger(map, 'resize');
+  map.setCenter(currCenter);
+})
+
+$('#btnlabels').toggle(function() {
+  map.setZoom(15);
+  map.setMapTypeId('hide_street_names')
+}, function() {
+  map.setMapTypeId(google.maps.MapTypeId.ROADMAP)
+})
+</script>
+</body>
+</html>
